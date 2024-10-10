@@ -1,0 +1,71 @@
+# Inputs pelo IaC (Terraform)
+substitutions:
+  _DOCKER_REPO: "us-east1-docker.pkg.dev/dazzling-matrix-436301-j5/imagens"
+  _APP: "app-vulneravel"
+  _DOCKER_FILE: "dockerfile"
+  _RUN_VULN_SCAN: "false" # Controla a execução do step de Scan de Vulnerabilidades (true or false)
+
+
+# Options Globais
+options:
+  substitutionOption: ALLOW_LOOSE #IGNORA VARIAVEIS "substitutions" AUSENTES
+
+steps:
+
+
+# Build Docker Image
+- id: 'Build Docker Image'
+  name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '$_DOCKER_REPO/$_APP/$_ENV:$SHORT_SHA', '.', '-f', '$_DOCKER_FILE']
+  dir: '${_DIR}'
+
+# Run a Vulnerability Scan at _SECURITY level and Analyze the result
+- id: 'Vulnerability Scan'
+  name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    if [[ "$_RUN_VULN_SCAN" == "true" ]]
+    then
+      (gcloud artifacts docker images scan \
+      $_DOCKER_REPO/$_APP/$_ENV:$SHORT_SHA \
+      --location us \
+      --format="value(response.scan)") > /workspace/scan_id.txt
+
+      echo "Vulnerability CRITICAL $(gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'CRITICAL';)"
+
+      echo "Vulnerability HIGH $(gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'HIGH';)"
+
+      echo "Vulnerability MEDIUM $(gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'MEDIUM';)"
+
+      echo "Vulnerability LOW $(gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'LOW';)"
+
+      echo "TOTAL $(gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'CRITICAL\|HIGH\|MEDIUM\|LOW';)"
+
+      gcloud artifacts docker images list-vulnerabilities \
+      $(cat /workspace/scan_id.txt) \
+      --format="value(vulnerability.effectiveSeverity)" | if grep -xq 'CRITICAL'; \
+      then echo "Vulnerability CRITICAL level found! Pipeline Canceled!" && exit 1; \
+      else echo "No CRITICAL vulnerability found, congrats !" && exit 0; fi
+    else
+      echo "Scan de Vulnerabilidades Desabilitado. Passando para o próximo step..."
+    fi  
+
+
+# Pushing image to Artifact Registry
+- id: 'Push Docker App Image'
+  name: 'gcr.io/cloud-builders/docker'
+  args: ['push', '$_DOCKER_REPO/$_APP/$_ENV:$SHORT_SHA']
+  dir: '${_DIR}'
+
