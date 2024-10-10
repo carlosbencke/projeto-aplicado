@@ -9,6 +9,7 @@ substitutions:
 # Options Globais
 options:
   substitutionOption: ALLOW_LOOSE #IGNORA VARIAVEIS "substitutions" AUSENTES
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
 
