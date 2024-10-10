@@ -15,7 +15,7 @@ steps:
 # Build Docker Image
 - id: 'Build Docker Image'
   name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', '$IMAGE_NAME', '.', '-f', dockerfile]
+  args: ['build', '-t', '$_IMAGE_NAME', '.', '-f', dockerfile]
   dir: '${_DIR}'
 
 # Run a Vulnerability Scan at _SECURITY level and Analyze the result
@@ -28,7 +28,7 @@ steps:
     if [[ "$_RUN_VULN_SCAN" == "true" ]]
     then
       (gcloud artifacts docker images scan \
-      $IMAGE_NAME \
+      $_IMAGE_NAME \
       --location us \
       --format="value(response.scan)") > /workspace/scan_id.txt
 
@@ -65,6 +65,6 @@ steps:
 # Pushing image to Artifact Registry
 - id: 'Push Docker App Image'
   name: 'gcr.io/cloud-builders/docker'
-  args: ['push', '$IMAGE_NAME']
+  args: ['push', '$_IMAGE_NAME']
   dir: '${_DIR}'
 
