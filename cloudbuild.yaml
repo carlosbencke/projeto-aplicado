@@ -1,7 +1,7 @@
 # Inputs pelo IaC (Terraform)
 substitutions:
   _IMAGE_NAME: us-east1-docker.pkg.dev/dazzling-matrix-436301-j5/imagens/app-vulneravel:latest
-  _RUN_VULN_SCAN: "false" # Controla a execução do step de Scan de Vulnerabilidades (true or false)
+  _RUN_VULN_SCAN: "true" # Controla a execução do step de Scan de Vulnerabilidades (true or false)
 
 
 # Options Globais
