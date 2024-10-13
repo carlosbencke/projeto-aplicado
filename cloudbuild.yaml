@@ -1,4 +1,3 @@
-# Inputs pelo IaC (Terraform)
 substitutions:
   _IMAGE_NAME: us-east1-docker.pkg.dev/dazzling-matrix-436301-j5/imagens/app-vulneravel:latest
   _RUN_VULN_SCAN: "true" # Controla a execução do step de Scan de Vulnerabilidades (true or false)
@@ -32,25 +31,30 @@ steps:
       --location us \
       --format="value(response.scan)") > /workspace/scan_id.txt
 
-      echo "Vulnerability CRITICAL $(gcloud artifacts docker images list-vulnerabilities \
+      scan=$(gcloud artifacts docker images list-vulnerabilities \
       $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'CRITICAL';)"
+      --format="value(vulnerability.effectiveSeverity)")
 
-      echo "Vulnerability HIGH $(gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'HIGH';)"
+        critical_count=$(echo "$scan" | grep -cx 'CRITICAL')
+        high_count=$(echo "$scan" | grep -cx 'HIGH')
+        medium_count=$(echo "$scan" | grep -cx 'MEDIUM')
+        low_count=$(echo "$scan" | grep -cx 'LOW')
+        total_count=$(echo "$scan" | wc -l)
+        slack_message="Análise de vulnerabilidades realizada em $_IMAGE_NAME\n \
+        CRITICAL: $critical_count\n \
+        HIGH: $high_count\n \
+        MEDIUM: $medium_count\n \
+        LOW: $low_count\n \
+        Total de vulnerabilidades: $total_count"
+        webhook_url="https://hooks.slack.com/services/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"
+        payload=$(cat <<EOF
+        {
+          "text": "$slack_message"
+        }
+        EOF
+        )
+        curl -X POST -H 'Content-type: application/json' --data "$payload" "$webhook_url"
 
-      echo "Vulnerability MEDIUM $(gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'MEDIUM';)"
-
-      echo "Vulnerability LOW $(gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'LOW';)"
-
-      echo "TOTAL $(gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | grep -cx 'CRITICAL\|HIGH\|MEDIUM\|LOW';)"
 
       gcloud artifacts docker images list-vulnerabilities \
       $(cat /workspace/scan_id.txt) \
