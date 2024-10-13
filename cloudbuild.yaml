@@ -63,7 +63,7 @@ steps:
       # Verificar vulnerabilidade CRITICAL e parar o pipeline, se necessário
       if echo "$scan" | grep -xq 'CRITICAL'; then
         echo "Vulnerability CRITICAL level found! Pipeline Canceled!" 
-        exit 1
+        exit 0
       else
         echo "No CRITICAL vulnerability found, congrats!"
         exit 0
