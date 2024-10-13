@@ -26,44 +26,52 @@ steps:
   - |
     if [[ "$_RUN_VULN_SCAN" == "true" ]]
     then
-      (gcloud artifacts docker images scan \
-      $_IMAGE_NAME \
-      --location us \
-      --format="value(response.scan)") > /workspace/scan_id.txt
+      # Rodar a análise de vulnerabilidades e salvar o scan_id
+      gcloud artifacts docker images scan \
+        $_IMAGE_NAME \
+        --location us \
+        --format="value(response.scan)" > /workspace/scan_id.txt
 
+      # Listar vulnerabilidades e contar severidades
       scan=$(gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)")
+        $(cat /workspace/scan_id.txt) \
+        --format="value(vulnerability.effectiveSeverity)")
 
-        critical_count=$(echo "$scan" | grep -cx 'CRITICAL')
-        high_count=$(echo "$scan" | grep -cx 'HIGH')
-        medium_count=$(echo "$scan" | grep -cx 'MEDIUM')
-        low_count=$(echo "$scan" | grep -cx 'LOW')
-        total_count=$(echo "$scan" | wc -l)
-        slack_message="Análise de vulnerabilidades realizada em $_IMAGE_NAME\n \
-        CRITICAL: $critical_count\n \
-        HIGH: $high_count\n \
-        MEDIUM: $medium_count\n \
-        LOW: $low_count\n \
-        Total de vulnerabilidades: $total_count"
-        webhook_url="https://hooks.slack.com/services/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"
-        payload=$(cat <<EOF
-        {
-          "text": "$slack_message"
-        }
-        EOF
-        )
-        curl -X POST -H 'Content-type: application/json' --data "$payload" "$webhook_url"
+      critical_count=$(echo "$scan" | grep -cx 'CRITICAL')
+      high_count=$(echo "$scan" | grep -cx 'HIGH')
+      medium_count=$(echo "$scan" | grep -cx 'MEDIUM')
+      low_count=$(echo "$scan" | grep -cx 'LOW')
+      total_count=$(echo "$scan" | wc -l)
 
+      # Mensagem para o Slack
+      slack_message="Análise de vulnerabilidades realizada em $_IMAGE_NAME\nCRITICAL: $critical_count\nHIGH: $high_count\nMEDIUM: $medium_count\nLOW: $low_count\nTotal de vulnerabilidades: $total_count"
 
-      gcloud artifacts docker images list-vulnerabilities \
-      $(cat /workspace/scan_id.txt) \
-      --format="value(vulnerability.effectiveSeverity)" | if grep -xq 'CRITICAL'; \
-      then echo "Vulnerability CRITICAL level found! Pipeline Canceled!" && exit 1; \
-      else echo "No CRITICAL vulnerability found, congrats !" && exit 0; fi
+      # URL do Webhook do Slack
+      webhook_url="https://hooks.slack.com/services/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"
+
+      # Criar o payload em uma linha
+      payload=$(cat <<EOF
+    {
+      "text": "$slack_message"
+    }
+    EOF
+    )
+
+      # Enviar o payload para o webhook do Slack
+      curl -X POST -H 'Content-type: application/json' --data "$payload" "$webhook_url"
+
+      # Verificar vulnerabilidade CRITICAL e parar o pipeline, se necessário
+      if echo "$scan" | grep -xq 'CRITICAL'; then
+        echo "Vulnerability CRITICAL level found! Pipeline Canceled!" 
+        exit 1
+      else
+        echo "No CRITICAL vulnerability found, congrats!"
+        exit 0
+      fi
     else
       echo "Scan de Vulnerabilidades Desabilitado. Passando para o próximo step..."
-    fi  
+    fi
+
 
 
 # Pushing image to Artifact Registry
